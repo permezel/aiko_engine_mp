@@ -19,14 +19,24 @@ rwid = (int) (width/6 - 3)
 nrings = 10
 thick = 4
 centre = 6
+
+# ring[] element defns:
+WID = 0
+COL = 1
+ROW = 2
 rings = []
+
 fly_row = height - nrings*thick - 2
-WID=0
-COL=1
-ROW=2
-left_slider = 50
-right_slider = 50
+
+BUTTON_R = 17
+BUTTON_L = 16
+
+left_slider = .5
+right_slider = .5
+
 ol = aiko.oled.oleds[1]
+
+hanoi_pause = False
 
 def ring_init(r, nr):
     rings.append([centre+r+1, cols[0], fly_row])
@@ -47,7 +57,7 @@ def ring_draw(r, how):
 	    pass
 	pass
     ol.show()
-    sleep_ms((int)((left_slider/100.0)*100))
+    sleep_ms(10 + (int)(left_slider*10))
     pass
 
 def accel(delta):
@@ -67,9 +77,14 @@ def ring_up(r, row):
         pass
     pass
 
-def ring_down(r, row):
+def ring_down(r, row, slow=False):
     while r[ROW] < row:
-	delta = accel(row - r[ROW])
+	delta = row - r[ROW]
+        if slow:
+	    if delta > thick: delta = thick
+	else:
+	    delta = accel(delta)
+            pass
         ring_draw(r, 0)
         r[ROW] += delta
         ring_draw(r, 1)
@@ -95,6 +110,8 @@ def ring_right(r, col):
     pass
     
 def move_ring(n, src, dst):
+    global hanoi_pause
+
     r = rings[n]
     ring_up(r, fly_row)
     poles[src] += thick
@@ -105,13 +122,20 @@ def move_ring(n, src, dst):
     ring_down(r, poles[dst])
     poles[dst] -= thick
 
-    sleep_ms((int)((right_slider/100.0)*1000))
+    sleep_ms(10 + (int)(right_slider*1000))
+
+    # pause when BUTTON_R is toggled
+    while hanoi_pause:
+        ol.fill_rect(0, 8, 128, 8, 0)
+        ol.text("Hanoi paused.", 0, 8)
+        sleep_ms(1000)
+        pass
     pass
 
 def place_ring(n):
     r = rings[n]
     row = poles[0]
-    ring_down(r, row)
+    ring_down(r, row, True)
     poles[0] -= thick
     ol.show()
     pass
@@ -154,7 +178,7 @@ def hanoi(n):
     pass
 
 def hanoi_thread():
-    #hanoi(nrings)
+    hanoi(nrings)
     while True:
         for n in range(2, nrings):
             hanoi(n+1)
@@ -165,20 +189,45 @@ def slider_handler(number, state, value):
     # print("Slider {}: {} {}".format(number, state, value))
     global left_slider, right_slider
 
-    if number == 12 and state == 1 and value > 0:
-	left_slider = value
-    elif number == 14 and state == 1 and value > 0:
-	right_slider = value
-	pass
+    if state == 1:
+        if value < 0: value = 0
+        if value > 100: value = 100
+        value = 100 - value
+        value /= 100
+
+        if number == 12:
+	    left_slider = value
+        elif number == 14:
+	    right_slider = value
+	    pass
+        pass
+
     ol.fill_rect(0, 8, 128, 8, 0)
-    ol.text("{}% {}%".format(left_slider/100, right_slider/100), 0, 8)
+    ol.text("{}% {}%".format(left_slider, right_slider), 0, 8)
     pass
     
+def button_handler(number, state):
+    global hanoi_pause
+
+    # print("Button {}: {}".format(number, "press" if state else "release"))
+    if number == BUTTON_L:
+	hanoi_pause = False
+    elif number == BUTTON_R:
+        hanoi_pause = True
+    pass
+    ol.fill_rect(0, 8, 128, 8, 0)
+    if hanoi_pause:
+	ol.text("Paused", 0, 8)
+        pass
+    pass
 
 def initialise():
     aiko.button.initialise()
     aiko.button.add_slider_handler(slider_handler, 12, 15)
     aiko.button.add_slider_handler(slider_handler, 14, 27)
+
+    aiko.button.add_button_handler(button_handler, [BUTTON_L, BUTTON_R])
+
     #
     # We need more stack space or else we bomb on small recursion
     #
