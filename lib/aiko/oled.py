@@ -19,6 +19,7 @@
 # Topic: /in   (oled:clear)
 #              (oled:log This is a test !)
 #              (oled:pixel x y)
+#              (oled:pixels x y x y ...)
 #              (oled:text x y This is a test !)
 #              oled.bg=1; oled.fg=0
 #
@@ -234,6 +235,15 @@ def on_oled_message(topic, payload_in):
     oleds_show()
     return True
 
+  if payload_in.startswith("(oled:pixels "):
+    tokens = [int(token) for token in payload_in[12:-1].split()]
+    token_pairs = [ (x, y) for x, y in zip( tokens[0 :: 2], tokens[1 :: 2] ) ]
+    for oled in oleds:
+      for x, y in token_pairs:
+        oled.pixel(x, height - y - 1, FG)
+    oleds_show()
+    return True
+
   # (oled:text x y message)
   if payload_in.startswith("(oled:text "):
     tokens = payload_in[11:-1].split()
@@ -261,8 +271,8 @@ class OLEDProxy:
   def blit(self, *args):
     if oleds_enabled: self.oled.blit(*args)
 
-  def constrast(self, constrast):
-    if oleds_enabled: self.oled.constrast(constrast)
+  def contrast(self, contrast):
+    if oleds_enabled: self.oled.contrast(contrast)
 
   def fill(self, c):
     if oleds_enabled: self.oled.fill(c)
